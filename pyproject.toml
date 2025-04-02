@@ -1,0 +1,28 @@
+[build-system]
+requires = ["setuptools>=61.0"]
+build-backend = "setuptools.build_meta"
+
+[project]
+name = "evalbase"
+version = "0.0.1"
+description = "Evalbase SDK for AI workflow telemetry using OpenTelemetry"
+authors = [{ name = "Zach Smith", email = "zach@evalbase.ai" }]
+readme = "README.md"
+license = { file = "LICENSE" }
+requires-python = ">=3.8"
+dependencies = [
+    "opentelemetry-api",
+    "opentelemetry-sdk",
+    "opentelemetry-exporter-otlp-proto-http"
+]
+
+[project.optional-dependencies]
+test = ["pytest", "pytest-asyncio"]
+
+[project.urls]
+homepage = "https://github.com/evalbase/evalbase-python-sdk"
+repository = "https://github.com/evalbase/evalbase-python-sdk"
+
+[tool.setuptools.packages.find]
+include = ["evalbase*"]
+
