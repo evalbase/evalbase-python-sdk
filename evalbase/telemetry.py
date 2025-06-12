@@ -33,7 +33,7 @@ def configure_telemetry(
     service_name: Optional[str] = None,
     endpoint: Optional[str] = None,
     api_key: Optional[str] = None,
-    loki_enabled: bool = False,
+    loki_enabled: bool = True,
 ):
     """
     Configures the telemetry setup for the evalbase Python SDK.
@@ -77,7 +77,7 @@ def configure_telemetry(
     trace_endpoint = f"{endpoint}/v1/traces"
     tracer_provider = TracerProvider(resource=resource)
     span_exporter = OTLPSpanExporter(endpoint=trace_endpoint, headers=headers)
-    tracer_provider.add_span_processor(BatchSpanProcessor(span_exporter))
+    tracer_provider.add_span_processor(BatchSpanProcessor(span_exporter, max_export_batch_size=10))
     trace.set_tracer_provider(tracer_provider)
     tracer = trace.get_tracer(resource_attrs["service.name"])
 
@@ -128,11 +128,12 @@ def record_function_data(
         is_loki_enabled,
     )
 
+    # Store everything in span attributes
+    span.set_attribute("function.args", func_args)
+    span.set_attribute("function.kwargs", func_kwargs)
+    span.set_attribute("function.return", func_result)
+
     if not is_loki_enabled:
-        # Store everything in span attributes
-        span.set_attribute("function.args", func_args)
-        span.set_attribute("function.kwargs", func_kwargs)
-        span.set_attribute("function.return", func_result)
         return
 
     global otel_logger, logger_provider
