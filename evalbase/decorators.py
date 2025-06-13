@@ -1,7 +1,9 @@
 # decorators.py
 import functools
+from typing import Optional
 import inspect
 from opentelemetry import trace, metrics
+from evalbase.telemetry import record_function_data
 
 from enum import Enum
 
@@ -37,12 +39,14 @@ def workflow(_func=None, *, name=None):
             span_name = name or func.__name__
 
             with tracer.start_as_current_span(span_name, record_exception=True) as span:
-                span.set_attribute("function.args", str(args))
-                span.set_attribute("function.kwargs", str(kwargs))
-                result = func(*args, **kwargs)
-                span.set_attribute("function.return", repr(result))
-                function_call_counter.add(1, {"function.name": span_name, "function.type": "workflow"})
-                return result
+                result_as_str = ""
+                try:
+                    result = func(*args, **kwargs)
+                    result_as_str = repr(result)
+                    return result
+                finally:
+                    record_function_data(str(args), str(kwargs), result_as_str, span)
+                    function_call_counter.add(1, {"function.name": span_name, "function.type": "workflow"})
 
         @functools.wraps(func)
         async def async_wrapper(*args, **kwargs):
@@ -57,12 +61,14 @@ def workflow(_func=None, *, name=None):
             span_name = name or func.__name__
 
             with tracer.start_as_current_span(span_name, record_exception=True) as span:
-                span.set_attribute("function.args", str(args))
-                span.set_attribute("function.kwargs", str(kwargs))
-                result = await func(*args, **kwargs)
-                span.set_attribute("function.return", repr(result))
-                function_call_counter.add(1, {"function.name": span_name, "function.type": "workflow"})
-                return result
+                result_as_str = ""
+                try:
+                    result = await func(*args, **kwargs)
+                    result_as_str = repr(result)
+                    return result
+                finally:
+                    record_function_data(str(args), str(kwargs), result_as_str, span)
+                    function_call_counter.add(1, {"function.name": span_name, "function.type": "workflow"})
 
         return async_wrapper if inspect.iscoroutinefunction(func) else sync_wrapper
 
@@ -76,7 +82,7 @@ def workflow(_func=None, *, name=None):
         return decorator
 
 
-def step(_func=None, *, type: StepType = None):
+def step(_func=None, *, type: Optional[StepType] = None):
     """
     Decorator for marking 'step' functions with an optional type to help categorize
     the step. Accepts a StepType enum (e.g., StepType.LLM).
@@ -96,18 +102,20 @@ def step(_func=None, *, type: StepType = None):
             span_name = f"{type.value}: {func.__name__}" if type else func.__name__
 
             with tracer.start_as_current_span(span_name, record_exception=True) as span:
-                if type:
-                    span.set_attribute("step.type", type.value)
-                span.set_attribute("function.args", str(args))
-                span.set_attribute("function.kwargs", str(kwargs))
-                result = func(*args, **kwargs)
-                span.set_attribute("function.return", repr(result))
-                function_call_counter.add(1, {
-                    "function.name": func.__name__,
-                    "function.type": "step",
-                    "step.type": type.value if type else "none"
-                })
-                return result
+                result_as_str = ""
+                try:
+                    if type:
+                        span.set_attribute("step.type", type.value)
+                    result = func(*args, **kwargs)
+                    result_as_str = repr(result)
+                    return result
+                finally:
+                    record_function_data(str(args), str(kwargs), result_as_str, span)
+                    function_call_counter.add(1, {
+                        "function.name": func.__name__,
+                        "function.type": "step",
+                        "step.type": type.value if type else "none"
+                    })
 
         @functools.wraps(func)
         async def async_wrapper(*args, **kwargs):
@@ -121,18 +129,20 @@ def step(_func=None, *, type: StepType = None):
 
             span_name = f"{type.value}: {func.__name__}" if type else func.__name__
             with tracer.start_as_current_span(span_name, record_exception=True) as span:
-                if type:
-                    span.set_attribute("step.type", type.value)
-                span.set_attribute("function.args", str(args))
-                span.set_attribute("function.kwargs", str(kwargs))
-                result = await func(*args, **kwargs)
-                span.set_attribute("function.return", repr(result))
-                function_call_counter.add(1, {
-                    "function.name": func.__name__,
-                    "function.type": "step",
-                    "step.type": type.value if type else "none"
-                })
-                return result
+                result_as_str = ""
+                try:
+                    if type:
+                        span.set_attribute("step.type", type.value)
+                    result = await func(*args, **kwargs)
+                    result_as_str = repr(result)
+                    return result
+                finally:
+                    record_function_data(str(args), str(kwargs), result_as_str, span)
+                    function_call_counter.add(1, {
+                        "function.name": func.__name__,
+                        "function.type": "step",
+                        "step.type": type.value if type else "none"
+                    })
 
         return async_wrapper if inspect.iscoroutinefunction(func) else sync_wrapper
 
